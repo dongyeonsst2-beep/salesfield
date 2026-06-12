@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>통합 데이터 조회</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+<style>
+  :root {
+    --bg:        #f6f7f9;
+    --surface:   #ffffff;
+    --ink:       #1a1f2b;
+    --muted:     #6b7280;
+    --line:      #e6e9ef;
+    --line-soft: #f0f2f6;
+    --accent:    #2f4bd1;
+    --accent-bg: #eaeefc;
+    --accent-line:#c6d2f7;
+    --num:       #0f2a5b;
+    --radius:    10px;
+    --shadow:    0 1px 2px rgba(20,28,46,.04), 0 4px 16px rgba(20,28,46,.05);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 22px 20px 64px; }
+
+  /* ===== 상단 바 ===== */
+  .topbar {
+    display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+    margin-bottom: 18px;
+  }
+  .topbar h1 {
+    margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -.01em;
+  }
+  .status { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .status b { color: var(--ink); font-weight: 600; }
+  .spacer { flex: 1; }
+  .btn {
+    appearance: none; border: 1px solid var(--line); background: var(--surface);
+    color: var(--ink); font: inherit; font-weight: 600; font-size: 13px;
+    padding: 8px 14px; border-radius: 8px; cursor: pointer;
+    transition: border-color .12s ease, background .12s ease, transform .04s ease;
+  }
+  .btn:hover { border-color: var(--accent-line); background: var(--accent-bg); color: var(--accent); }
+  .btn:active { transform: translateY(1px); }
+  .btn:disabled { opacity: .55; cursor: default; }
+
+  /* ===== 컨트롤 패널 ===== */
+  .panel {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 14px 16px; margin-bottom: 14px;
+  }
+  .search-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .search {
+    flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 8px;
+    padding: 9px 12px; font: inherit; font-size: 14px; color: var(--ink);
+    background: #fbfcfe;
+  }
+  .search:focus { outline: none; border-color: var(--accent-line); background: #fff;
+    box-shadow: 0 0 0 3px var(--accent-bg); }
+  .search::placeholder { color: #9aa1ad; }
+
+  .cols-label {
+    font-size: 11.5px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .06em; margin: 2px 0 8px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .cols-label .reset {
+    text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--accent);
+    background: none; border: none; cursor: pointer; font-size: 12px; padding: 0;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+  .chip {
+    border: 1px solid var(--line); background: #fff; color: var(--muted);
+    font: inherit; font-size: 12.5px; font-weight: 600;
+    padding: 5px 11px; border-radius: 999px; cursor: pointer; user-select: none;
+    transition: all .12s ease; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .chip::before {
+    content: ""; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--line); transition: background .12s ease;
+  }
+  .chip.on { color: var(--accent); background: var(--accent-bg); border-color: var(--accent-line); }
+  .chip.on::before { background: var(--accent); }
+
+  /* ===== 표 ===== */
+  .tablecard {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
+  }
+  .scroll { overflow: auto; max-height: 68vh; }
+  table { border-collapse: separate; border-spacing: 0; width: 100%; }
+  thead th {
+    position: sticky; top: 0; z-index: 2; background: #fbfcfe;
+    text-align: left; font-size: 12.5px; font-weight: 700; color: var(--ink);
+    padding: 10px 12px; white-space: nowrap; cursor: pointer;
+    border-bottom: 1px solid var(--line);
+  }
+  thead th:hover { background: var(--accent-bg); }
+  thead th .arrow { color: var(--accent); font-size: 11px; margin-left: 4px; }
+  /* 헤더 아래 컬럼별 필터 행 */
+  thead tr.filters th { position: sticky; top: 38px; z-index: 1; background: #fff;
+    padding: 6px 8px; border-bottom: 1px solid var(--line); cursor: default; }
+  thead tr.filters input {
+    width: 100%; border: 1px solid var(--line-soft); border-radius: 6px;
+    padding: 5px 7px; font: inherit; font-size: 12.5px; background: #fafbfd;
+  }
+  thead tr.filters input:focus { outline: none; border-color: var(--accent-line);
+    background: #fff; box-shadow: 0 0 0 2px var(--accent-bg); }
+  thead tr.filters th:hover { background: #fff; }
+
+  tbody td {
+    padding: 8px 12px; border-bottom: 1px solid var(--line-soft);
+    white-space: nowrap; font-variant-numeric: tabular-nums;
+    max-width: 360px; overflow: hidden; text-overflow: ellipsis;
+  }
+  tbody tr:hover td { background: #fafbff; }
+  td.num { text-align: right; color: var(--num); }
+
+  tfoot td {
+    position: sticky; bottom: 0; background: #f4f6fb;
+    border-top: 1px solid var(--line); padding: 9px 12px;
+    font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  tfoot td.num { text-align: right; color: var(--num); }
+  tfoot td.lbl { color: var(--muted); font-weight: 600; }
+
+  /* ===== 상태 화면 ===== */
+  .state { padding: 56px 24px; text-align: center; color: var(--muted); }
+  .state h2 { color: var(--ink); font-size: 15px; margin: 0 0 6px; }
+  .state p { margin: 0; font-size: 13px; }
+  .state.error h2 { color: #b3261e; }
+  .state code { background: #f0f2f6; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+  .dot-load { display: inline-block; }
+  @media (prefers-reduced-motion: no-preference) {
+    .dot-load::after { content: ""; animation: dots 1.2s steps(4,end) infinite; }
+    @keyframes dots { 0%{content:""} 25%{content:"."} 50%{content:".."} 75%{content:"..."} 100%{content:""} }
+  }
+  @media (max-width: 640px) {
+    .wrap { padding: 16px 12px 48px; }
+    .scroll { max-height: 72vh; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <h1>통합 데이터 조회</h1>
+    <span class="status" id="status">불러오는 중<span class="dot-load"></span></span>
+    <span class="spacer"></span>
+    <button class="btn" id="refresh" disabled>새로고침</button>
+  </div>
+
+  <div class="panel" id="panel" hidden>
+    <div class="search-row">
+      <input class="search" id="search" type="search" placeholder="전체 검색 — 모든 컬럼에서 찾기" />
+    </div>
+    <div class="cols-label">
+      표시할 컬럼
+      <button class="reset" id="colsReset">모두 표시</button>
+    </div>
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <div class="tablecard">
+    <div class="scroll">
+      <table id="table">
+        <thead id="thead"></thead>
+        <tbody id="tbody"></tbody>
+        <tfoot id="tfoot"></tfoot>
+      </table>
+    </div>
+    <div class="state" id="state">
+      <h2>데이터를 불러오는 중<span class="dot-load"></span></h2>
+      <p>OneDrive의 파일을 읽고 있어요.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ===== 설정: 배포한 GAS 웹앱 주소(.../exec)를 여기에 ===== */
+const GAS_URL = "https://script.google.com/macros/s/AKfycbyTpUkcvlc4m8Lv3KsX53imisohNtU8M1X1ypTZtBcl_zDFV0rKePF-3AxgZuZ-0FSu/exec";
+/* ====================================================== */
+
+const state = {
+  headers: [],
+  rows: [],
+  visible: {},          // 컬럼명 -> 표시 여부
+  colFilters: {},       // 컬럼명 -> 필터 문자열
+  search: "",
+  sortKey: null,
+  sortDir: 1,           // 1 오름, -1 내림
+  numericCols: {}       // 컬럼명 -> 숫자형 여부
+};
+
+const $ = (id) => document.getElementById(id);
+
+function showState(kind, title, msg) {
+  const el = $("state");
+  el.className = "state" + (kind === "error" ? " error" : "");
+  el.innerHTML = "<h2>" + title + "</h2><p>" + (msg || "") + "</p>";
+  el.hidden = false;
+  $("table").style.display = "none";
+}
+function hideState() {
+  $("state").hidden = true;
+  $("table").style.display = "";
+}
+
+async function load() {
+  $("refresh").disabled = true;
+  $("status").innerHTML = '불러오는 중<span class="dot-load"></span>';
+  if (!state.rows.length) showState("load", '데이터를 불러오는 중<span class="dot-load"></span>', "OneDrive의 파일을 읽고 있어요.");
+  try {
+    const res = await fetch(GAS_URL, { method: "GET" });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "백엔드 오류");
+    state.headers = data.headers || [];
+    state.rows = data.rows || [];
+    detectNumeric();
+    initVisibility();
+    buildChips();
+    render();
+    const when = data.refreshedAt ? new Date(data.refreshedAt) : new Date();
+    $("status").innerHTML = "<b>" + state.rows.length.toLocaleString() + "</b>건 · " +
+      when.toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" }) + " 기준";
+    $("panel").hidden = false;
+  } catch (err) {
+    showState("error", "불러오지 못했어요",
+      "백엔드 주소나 연결 상태를 확인해 주세요.<br><code>" + (err.message || err) + "</code>");
+    $("status").textContent = "오류";
+  } finally {
+    $("refresh").disabled = false;
+  }
+}
+
+function detectNumeric() {
+  state.numericCols = {};
+  state.headers.forEach((h) => {
+    let hasVal = false, allNum = true;
+    for (const r of state.rows) {
+      const v = r[h];
+      if (v === "" || v === null || v === undefined) continue;
+      hasVal = true;
+      if (typeof v === "number") continue;
+      const n = Number(String(v).replace(/,/g, ""));
+      if (Number.isNaN(n)) { allNum = false; break; }
+    }
+    state.numericCols[h] = hasVal && allNum;
+  });
+}
+
+function initVisibility() {
+  // 처음 한 번만 전부 표시로 초기화 (이미 설정돼 있으면 유지)
+  state.headers.forEach((h) => {
+    if (!(h in state.visible)) state.visible[h] = true;
+  });
+}
+
+function buildChips() {
+  const box = $("chips");
+  box.innerHTML = "";
+  state.headers.forEach((h) => {
+    const chip = document.createElement("button");
+    chip.className = "chip" + (state.visible[h] ? " on" : "");
+    chip.textContent = h;
+    chip.onclick = () => {
+      state.visible[h] = !state.visible[h];
+      chip.classList.toggle("on", state.visible[h]);
+      render();
+    };
+    box.appendChild(chip);
+  });
+}
+
+function visibleHeaders() {
+  return state.headers.filter((h) => state.visible[h]);
+}
+
+function asNumber(v) {
+  if (typeof v === "number") return v;
+  const n = Number(String(v).replace(/,/g, ""));
+  return Number.isNaN(n) ? null : n;
+}
+
+function filteredRows() {
+  const q = state.search.trim().toLowerCase();
+  const vis = visibleHeaders();
+  const colF = Object.entries(state.colFilters)
+    .filter(([k, v]) => v && v.trim())
+    .map(([k, v]) => [k, v.trim().toLowerCase()]);
+
+  let rows = state.rows.filter((r) => {
+    // 전체 검색
+    if (q) {
+      const hit = vis.some((h) => String(r[h]).toLowerCase().includes(q));
+      if (!hit) return false;
+    }
+    // 컬럼별 필터
+    for (const [k, v] of colF) {
+      if (!String(r[k]).toLowerCase().includes(v)) return false;
+    }
+    return true;
+  });
+
+  // 정렬
+  if (state.sortKey) {
+    const k = state.sortKey, dir = state.sortDir, isNum = state.numericCols[k];
+    rows = rows.slice().sort((a, b) => {
+      if (isNum) {
+        const na = asNumber(a[k]), nb = asNumber(b[k]);
+        if (na === null) return 1; if (nb === null) return -1;
+        return (na - nb) * dir;
+      }
+      return String(a[k]).localeCompare(String(b[k]), "ko") * dir;
+    });
+  }
+  return rows;
+}
+
+function render() {
+  const vis = visibleHeaders();
+  if (!vis.length) { showState("load", "표시할 컬럼이 없어요", "위에서 컬럼을 하나 이상 켜 주세요."); return; }
+  hideState();
+
+  // 머리글 + 필터 행
+  const thead = $("thead");
+  thead.innerHTML = "";
+  const hr = document.createElement("tr");
+  vis.forEach((h) => {
+    const th = document.createElement("th");
+    th.textContent = h;
+    if (state.sortKey === h) {
+      const arrow = document.createElement("span");
+      arrow.className = "arrow";
+      arrow.textContent = state.sortDir === 1 ? "▲" : "▼";
+      th.appendChild(arrow);
+    }
+    th.onclick = () => {
+      if (state.sortKey === h) state.sortDir *= -1;
+      else { state.sortKey = h; state.sortDir = 1; }
+      render();
+    };
+    hr.appendChild(th);
+  });
+  thead.appendChild(hr);
+
+  const fr = document.createElement("tr");
+  fr.className = "filters";
+  vis.forEach((h) => {
+    const th = document.createElement("th");
+    const inp = document.createElement("input");
+    inp.type = "text";
+    inp.placeholder = "필터";
+    inp.value = state.colFilters[h] || "";
+    inp.oninput = (e) => { state.colFilters[h] = e.target.value; renderBody(); };
+    th.appendChild(inp);
+    fr.appendChild(th);
+  });
+  thead.appendChild(fr);
+
+  renderBody();
+}
+
+function renderBody() {
+  const vis = visibleHeaders();
+  const rows = filteredRows();
+
+  const tbody = $("tbody");
+  tbody.innerHTML = "";
+  const frag = document.createDocumentFragment();
+  rows.forEach((r) => {
+    const tr = document.createElement("tr");
+    vis.forEach((h) => {
+      const td = document.createElement("td");
+      const isNum = state.numericCols[h];
+      const v = r[h];
+      if (isNum && v !== "" && v !== null && v !== undefined) {
+        td.className = "num";
+        const n = asNumber(v);
+        td.textContent = n === null ? v : n.toLocaleString("ko-KR");
+      } else {
+        td.textContent = (v === null || v === undefined) ? "" : v;
+      }
+      tr.appendChild(td);
+    });
+    frag.appendChild(tr);
+  });
+  tbody.appendChild(frag);
+
+  // 합계 행
+  const tfoot = $("tfoot");
+  tfoot.innerHTML = "";
+  const tr = document.createElement("tr");
+  vis.forEach((h, i) => {
+    const td = document.createElement("td");
+    if (i === 0) {
+      td.className = "lbl";
+      td.textContent = rows.length.toLocaleString() + "건";
+    } else if (state.numericCols[h]) {
+      td.className = "num";
+      const sum = rows.reduce((acc, r) => {
+        const n = asNumber(r[h]); return acc + (n === null ? 0 : n);
+      }, 0);
+      td.textContent = sum.toLocaleString("ko-KR");
+    } else {
+      td.textContent = "";
+    }
+    tr.appendChild(td);
+  });
+  tfoot.appendChild(tr);
+
+  $("status").innerHTML = $("status").innerHTML; // 유지
+}
+
+/* 이벤트 */
+$("search").oninput = (e) => { state.search = e.target.value; renderBody(); };
+$("refresh").onclick = load;
+$("colsReset").onclick = () => {
+  state.headers.forEach((h) => state.visible[h] = true);
+  buildChips(); render();
+};
+
+/* 시작 */
+if (GAS_URL.startsWith("PASTE_")) {
+  showState("error", "백엔드 주소를 먼저 넣어주세요",
+    "이 파일 안의 <code>GAS_URL</code> 값을 배포한 GAS 웹앱의 <code>/exec</code> 주소로 바꾸세요.");
+  $("status").textContent = "설정 필요";
+} else {
+  load();
+}
+</script>
+</body>
+</html>
